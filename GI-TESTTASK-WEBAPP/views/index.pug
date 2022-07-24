@@ -3,3 +3,19 @@ extends layout
 block content
   h1= title
   p Tere tulemast rakendusse <i>#{title}</i>!
+  h2 Sisend
+  form(
+    action="/data"
+    method="POST"
+    enctype="multipart/form-data"
+  )
+    input(
+      type='file'
+      id='datafiles'
+      name='datafiles'
+      multiple
+    )
+    input(
+      type='submit'
+    )
+  h2 Kuva

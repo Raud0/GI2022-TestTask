@@ -3,6 +3,7 @@
 * Pug  
 * node-postgres  
 It was my first time doing most of this myself, so it feels a bit too hacky/eclectic for my liking.  
+
 Time spent: 20h.  
 
 ## Installation  

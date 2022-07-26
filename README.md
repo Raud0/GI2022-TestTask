@@ -29,9 +29,9 @@ It can later be deleted by running `drop_gipeople.js`
 ```
 node .\drop_gipeople.js
 ```  
-Start the server by running `app.js`  
+Start the server by running the following  
 ```
-node .\app.js
+npx cross-env DEBUG=gi-testtask-webapp:* npm start
 ```  
 The server will open on http://localhost:3000/.  
 

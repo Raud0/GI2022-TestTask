@@ -33,7 +33,7 @@ Start the server by running `app.js`
 ```
 node .\app.js
 ```  
-Access the server on your localhost (for me it was http://localhost:3000/).  
+The server will open on http://localhost:3000/.  
 
 ### Prerequisites to Installation  
 What I used is in parentheses.  

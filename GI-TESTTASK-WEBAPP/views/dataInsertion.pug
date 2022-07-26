@@ -1,0 +1,13 @@
+extends layout
+
+block content
+  h1 Your files have been uploaded
+  p It will take a couple of minutes to load larger files into the database.
+  form(
+    action="/returnRequest"
+    method="POST"
+  )
+    input(
+      type='submit'
+      value='Return'
+    )

@@ -1,11 +1,11 @@
 extends layout
 
 block content
-  h1= title
-  p Tere tulemast rakendusse <i>#{title}</i>!
-  h2 Sisend
+  h1 #{title}
+  p Welcome to #{title}!
+  h2 Insertion
   form(
-    action="/data"
+    action="/dataInsertionRequest"
     method="POST"
     enctype="multipart/form-data"
   )
@@ -15,7 +15,27 @@ block content
       name='datafiles'
       multiple
     )
+    br
     input(
       type='submit'
+      value='Upload Files '
+      class='largeInsertion'
     )
-  h2 Kuva
+  h2 View
+  form(
+    action="/dataViewRequest"
+    method="POST"
+  )
+    input(
+      type='text'
+      id='id_code'
+      name='id_code'
+      class='largeInsertion'
+      value=''
+    )
+    br
+    input(
+      type='submit'
+      value='Search for ID'
+      class='largeInsertion'
+    )

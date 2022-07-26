@@ -1,0 +1,120 @@
+extends layout
+
+block content
+  meta(
+    name='datastring',
+    content= {dataString}
+  )
+  h1 Data View
+
+  form(
+    action="/returnRequest"
+    method="POST"
+  )
+    input(
+      type='submit'
+      value='Return'
+    )
+  br
+  form(
+    action="/dataViewRequest"
+    method="POST"
+  )
+    input(
+      type='submit'
+      name='arrow'
+      value='<'
+    )
+    input(
+      type='number'
+      id='offset'
+      name='offset'
+      class='smallInsertion'
+      value= offset
+    )
+    input(
+      type='submit'
+      name='arrow'
+      value='>'
+    )
+    span='  match: '
+    input(
+      type='text'
+      id='id_code'
+      name='id_code'
+      class='largeInsertion'
+      value= id
+    )
+    span='  display: '
+    input(
+      type='number'
+      id='limit'
+      name='limit'
+      class='smallInsertion'
+      value= limit
+    )
+    
+  p#showData
+
+  form(
+    action="/dataViewRequest"
+    method="POST"
+  )
+    input(
+      type='submit'
+      name='arrow'
+      value='<'
+    )
+    input(
+      type='number'
+      id='offset'
+      name='offset'
+      class='smallInsertion'
+      value= offset
+    )
+    input(
+      type='submit'
+      name='arrow'
+      value='>'
+    )
+    span='  match: '
+    input(
+      type='text'
+      id='id_code'
+      name='id_code'
+      class='largeInsertion'
+      value= id
+    )
+    span='  display: '
+    input(
+      type='number'
+      id='limit'
+      name='limit'
+      class='smallInsertion'
+      value= limit
+    )
+  
+  script.
+    var dataString = document.getElementsByName('datastring')[0].content;
+    var data = JSON.parse(JSON.parse(dataString).dataString);
+    var labels = ['id', 'ID number', 'first name', 'last name', 'e-mail', 'sex', 'code', 'department', 'time of visit', 'age at visit'];
+    var internal_labels = ['id', 'id_code', 'first_name', 'last_name', 'email', 'sex', 'code', 'dep', 'visit_time', 'age_at_visit'];
+    var table = document.createElement("table");
+    var tr = table.insertRow(-1);
+    for(var i = 0; i < labels.length; i++) {
+      var th = document.createElement("th");
+      th.innerHTML = labels[i];
+      tr.appendChild(th);
+    }
+    for(var j = 0; j < data.length; j++) {
+      tr = table.insertRow(-1);
+      var dataRow = JSON.stringify(data[j]);
+      for( var i = 0; i < internal_labels.length; i++) {
+        var tabCell = tr.insertCell(-1);
+        tabCell.innerHTML = data[j][internal_labels[i]];
+      }
+    }
+    var divContainer = document.getElementById("showData");
+    divContainer.innerHTML = "";
+    divContainer.appendChild(table);
+  

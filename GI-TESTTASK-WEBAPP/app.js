@@ -12,12 +12,14 @@ var { Pool } = require('pg');
 var config = require('config');
 
 const indexRouter = require('./routes/index');
-const usersRouter = require('./routes/users');
+const datainsertionRouter = require('./routes/dataInsertion')
+const dataviewRouter = require('./routes/dataView')
 const { json } = require('body-parser');
 const fileUpload = require('express-fileupload');
 const { parse } = require('path');
 const { timeStamp } = require('console');
 const { Stream } = require('stream');
+const { rows } = require('pg/lib/defaults');
 
 const app = express();
 
@@ -36,11 +38,12 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/', indexRouter);
-app.use('/users', usersRouter);
+app.use('/dataInsertion', datainsertionRouter);
+//app.use('/dataView', dataviewRouter);
 
-app.post('/data', async(req,res) => {
+app.post('/dataInsertionRequest', async(req,res) => {
   if(!req.files) {
-    res.redirect(500,'/');
+    return res.redirect(500,'/');
   } else {
     let resDatafiles = req.files.datafiles;
     if (!(Object.prototype.toString.call(resDatafiles) === '[object Array]')) {
@@ -55,8 +58,44 @@ app.post('/data', async(req,res) => {
     }
     uploadFiles(datafilenames);
 
-    res.redirect(200,'/');
+    return res.redirect(302,'/dataInsertion');
   }
+});
+app.post('/dataViewRequest', async(req,res) => {
+  let id = ''
+  if(req.body.id_code) {
+    id = req.body.id_code;
+  }
+  let limit = 50;
+  if(req.body.limit) {
+    limit = parseInt(req.body.limit);
+  }
+  let offset = 0;
+  if(req.body.offset) {
+    offset = parseInt(req.body.offset);
+  }
+  if (req.body.arrow == '<') {
+    offset = Math.max(offset - 1,0);
+  } else if (req.body.arrow == '>') {
+    offset = offset + 1;
+  }
+  return res.redirect(301,'/dataView?id=' + id + '&limit=' + limit + '&offset=' + offset);
+});
+app.get('/dataView', async(req, res) => {
+  const id = req.query.id;
+  const limit = req.query.limit;
+  const offset = req.query.offset;
+  const dataRes = await getData(id, limit, offset);
+
+  res.render('dataView', {
+    id: id,
+    limit: parseInt(limit),
+    offset: parseInt(offset),
+    dataString: JSON.stringify(dataRes)
+  });
+});
+app.post('/returnRequest', async(req,res) => {
+  return res.redirect(302,'/');
 });
 
 // catch 404 and forward to error handler
@@ -73,9 +112,40 @@ app.use(function(err, req, res, next) {
   // render the error page
   res.status(err.status || 500);
   res.render('error');
+
+  return ;
 });
 
 module.exports = app;
+
+async function getData(id, limit, offset) {
+  const id_code_query = 'SELECT * FROM people WHERE id_code LIKE \'%s%%\' ORDER BY id LIMIT %s OFFSET %s;';
+  const format_id_code_query = pgFormat(id_code_query, id, String(limit), String(limit * offset));
+  
+  var pool = new Pool({
+    user: config.get('database.user'),
+    host: config.get('database.host'),
+    database: 'GI_PEOPLE',
+    password: config.get('database.password'),
+    port: config.get('database.port')
+  });
+
+  var data = null;
+  const readFileIntoDatabase = (query) => new Promise((resolve, reject) => {
+    pool.connect((err, client, done) => {
+      if (err) throw err
+      client.query(query, (err, res) => {
+        done()
+        if (res) {
+          data = res.rows;
+        }
+        resolve();
+      })
+    })
+  });
+  await readFileIntoDatabase(format_id_code_query);
+  return data;
+}
 
 async function uploadFiles(filenames) {
   var pool = new Pool({
@@ -86,15 +156,24 @@ async function uploadFiles(filenames) {
     port: config.get('database.port')
   });
   
+  // QUERY TEMPLATES
   const queryCreateTablePeople = 'CREATE TABLE IF NOT EXISTS "people" ("id" SERIAL PRIMARY KEY, "id_code" VARCHAR(32), "first_name" VARCHAR(64), "last_name" VARCHAR(64), "email" VARCHAR(255), "sex" VARCHAR(1), "code" VARCHAR(64), "dep" VARCHAR(32), "visit_time" TIMESTAMP, "age_at_visit" INT2);';
   const queryInsertIntoPeople = 'INSERT INTO "people" ("id_code", "first_name", "last_name", "email", "sex", "code", "dep", "visit_time", "age_at_visit") VALUES %L';
+
+  // COLUMN LABEL MAPPING REGEX
+  const id_code_re = /.*((((id(ent.*)?)|(insurance))[-_ ]?((code)|(n(umbe)?r)))|(((id(ent.*)?)|(isiku))[-_ )]?((kood)|(n(umbe)?r)))|(id(ent.*)?))/;
+  const first_name_re = /(((1)|(first)|(fore))(.*na?me?)?)|(((1)|(ees)|(esi))(.*ni?mi?)?)/;
+  const last_name_re = /(((2)|(second)|(sur)|(family)|(last))(.*na?me?)?)|(((2)|(pere)|(teine))(.*ni?mi?)?)/;
+  const email_re = /(e(le(c|k).*)?)?[-_ ]?((m(a|e)ili?)|(po?sti?))(.*((aad)|(add)|(adr)).*)?/;
+  const code_re = /(co?de?)|(k(oo)?d)(\.)?/;
+  const dep_re = /(de?pa?r?t?m?e?n?t?)|(osa?(ko?nd)?)/;
+  const visit_time_re = /((vi?si?t)?[-_ ]?time)|(((visiidi)|(k.?la?stus))?[-_ ]?aeg)/;
   
   ;(async () => {
-    // note: we don't try/catch this because if connecting throws an exception
-    // we don't need to dispose of the client (it will be undefined)
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
+      console.log("BEGAN A TRANSACTION WITH THE DATABASE");
       
       const resToTableCreation = await client.query(queryCreateTablePeople);
       
@@ -102,35 +181,32 @@ async function uploadFiles(filenames) {
         let filename = filenames[i];
         let filepath = './uploads/' + filename;
 
-        // REGEX for column mapping
+        // Unknown columns
         let id_code_col = -1;
-        const id_code_re = /.*((((id(ent.*)?)|(insurance))[-_ ]?((code)|(n(umbe)?r)))|(((id(ent.*)?)|(isiku))[-_ )]?((kood)|(n(umbe)?r)))|(id(ent.*)?))/;
         let first_name_col = -1;
-        const first_name_re = /(((1)|(first)|(fore))(.*na?me?)?)|(((1)|(ees)|(esi))(.*ni?mi?)?)/;
         let last_name_col = -1;
-        const last_name_re = /(((2)|(second)|(sur)|(family)|(last))(.*na?me?)?)|(((2)|(pere)|(teine))(.*ni?mi?)?)/;
         let email_col = -1;
-        const email_re = /e?[-_ ]?(m(a|e)il)(.*((aad)|(add)|(adr)).*)?/;
         let code_col = -1;
-        const code_re = /(co?de?)|(k(oo)?d)(\.)?/;
         let dep_col = -1;
-        const dep_re = /(de?pa?r?t?m?e?n?t?)|(osa?(ko?nd)?)/;
         let visit_time_col = -1;
-        const visit_time_re = /((vi?si?t)?[-_ ]?time)|(((visiidi)|(k.?la?stus))?[-_ ]?aeg)/;
 
-        const values = [];
-        let j = 0;
-
+        // Buffer for uploading multiple
+        var insertionValueBuffer = [];
+        
         const readFileIntoDatabase = (file) => new Promise((resolve, reject) => {
           var instream = fs.createReadStream(file);
-          var outstream = new Stream;
-          const rl = readline.createInterface(instream, outstream);
-          
           instream.on('end', resolve);
+          var outstream = new Stream;
+          
+          let j = 0;
+          const rl = readline.createInterface(instream, outstream);
           rl.on('line', (line) => {
             if (j) {
-              // when not on first line of file, give values based on column map
+              // every value in a row is null unless a proper value can be added
               let value = [null,null,null,null,null,null,null,null,null];
+              
+              // PARSE LINE
+              // no insertion is made if sought column for data was not found (col == -1)
               let strings = line.split(';');
               //0: id code
               if (id_code_col != -1) {
@@ -184,7 +260,7 @@ async function uploadFiles(filenames) {
                 }
                 value[7] = visitTime;
               }
-              //8: age at visit, bound to produce some innacuracies
+              //8: age at visit
               if (value[7] && value[0]) {
                 let cleanId = value[0];
                 cleanId = cleanId.replace(/[^0-9]/g,'');
@@ -210,9 +286,11 @@ async function uploadFiles(filenames) {
                   }
                 }
               }
-              values[j - 1] = value;
+
+              // saving value to insert buffer (j is always 1 or greater here)
+              insertionValueBuffer[j - 1] = value;
             } else {
-              // when on first line of file, map columns
+              // assuming first line has column labels and the seperator is ';'
               let columnstrings = line.split(';');
               for (let h in columnstrings) {
                 let columnstring = columnstrings[h];
@@ -231,31 +309,33 @@ async function uploadFiles(filenames) {
                 } else if (columnstring.match(visit_time_re)) {
                   visit_time_col = h;
                 } else {
-                  console.log("Could not match string " + columnstring + "!");
+                  console.log("Could not match string " + columnstring + " in file " + file + ".");
                 }
               }
             }
             j++;
 
-            if (values.length >= 950) {
-              const resToTableInsertion = client.query(pgFormat(queryInsertIntoPeople, values));
-              //console.log("Inserted some rows of " + filepath);
-              values.length = 0;
+            // Inserting and emptying valuebuffer, maximum rows you can insert at once is 1000
+            if (insertionValueBuffer.length > 999) {
+              const resToTableInsertion = client.query(pgFormat(queryInsertIntoPeople, insertionValueBuffer));
+              insertionValueBuffer.length = 0;
               j = 1;
             }
           });
         });
         
         console.log("STARTED READING FILE INTO DATABASE: " + filepath);
+        
+        // Reading all rows and inserting them into the database
         await readFileIntoDatabase(filepath);
-        
-        
-        const resToTableInsertion = await client.query(pgFormat(queryInsertIntoPeople, values));
-        //console.log("Inserted last rows of " + filepath);
-        
+        // Inserting rest of the valuebuffer
+        if (insertionValueBuffer > 0) {
+          const resToTableInsertion = await client.query(pgFormat(queryInsertIntoPeople, insertionValueBuffer));
+        }
         
         console.log("FINISHED READING FILE INTO DATABASE: " + filepath);
 
+        // Uploaded file is deleted after finishing
         fs.unlink(filepath, (err) => {
           if (err) {
             throw err;
@@ -264,8 +344,10 @@ async function uploadFiles(filenames) {
       }
 
       await client.query('COMMIT');
+      console.log("COMMITTED TRANSACTION TO THE DATABASE");
     } catch (e) {
       await client.query('ROLLBACK');
+      console.log("ROLLED BACK TRANSACTION TO THE DATABASE");
       throw e;
     } finally {
       client.release();

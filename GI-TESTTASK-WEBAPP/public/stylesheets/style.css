@@ -3,6 +3,23 @@ body {
   font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
 }
 
+table, th, td 
+{
+  border: solid 1px #DDD;
+  border-collapse: collapse;
+  padding: 2px 3px;
+  text-align: center;
+}
+
+.smallInsertion
+{
+  width: 30px;
+}
+
+th {
+  font-weight:bold;
+}
+
 a {
   color: #00B7FF;
 }

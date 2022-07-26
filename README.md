@@ -7,6 +7,15 @@ It was my first time doing most of this myself, so it feels a bit too hacky/ecle
 Time spent: 20h.  
 
 ## Installation  
+### Prerequisites to Installation  
+What I used is in parentheses.  
+* Operating system (x86-64 Windows)  
+* A terminal programme (Windows PowerShell (with admin access))  
+* Node.js (Node Version Manager for Windows, 16.16.0)  
+* Node Package Manager (8.11.0)  
+* PostgreSQL (14.4 Windows x86-64)  
+
+### Walkthrough
 Clone the project and open it in a terminal that supports `node` and `npm` commands.  
 ```
 git clone https://github.com/Raud0/GI2022-TestTask.git
@@ -35,10 +44,3 @@ npx cross-env DEBUG=gi-testtask-webapp:* npm start
 ```  
 The server will open on http://localhost:3000/.  
 
-### Prerequisites to Installation  
-What I used is in parentheses.  
-* Operating system (x86-64 Windows)  
-* A terminal programme (Windows PowerShell (with admin access))  
-* Node.js (Node Version Manager for Windows, 16.16.0)  
-* Node Package Manager (8.11.0)  
-* PostgreSQL (14.4 Windows x86-64)  
